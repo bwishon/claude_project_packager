@@ -4,7 +4,6 @@ from pathlib import Path
 import logging
 import sys
 import os
-import xml.etree.ElementTree as ET
 from tqdm import tqdm
 
 from core import (
@@ -13,7 +12,6 @@ from core import (
     MAX_TOKENS_PER_MESSAGE,
     CHARS_PER_TOKEN
 )
-from gitignore import parse_gitignore, should_ignore
 from file_processing import scan_directory, create_file_batch
 from xml_generator import create_xml_document
 
@@ -50,15 +48,11 @@ def main() -> int:
             logging.error(f"Error: {root_dir} is not a directory")
             return 1
             
-        # Parse gitignore patterns
-        gitignore = root_dir / '.gitignore'
-        ignore_patterns = parse_gitignore(gitignore)
-        
         logging.info(f"Scanning directory: {root_dir}")
         
         # Scan directory for files
         logging.debug("\nStarting file scan...")
-        all_files, ignored_files, binary_files = scan_directory(root_dir, ignore_patterns)
+        all_files, ignored_files, binary_files = scan_directory(root_dir)
         
         # Get file statistics
         file_types, total_size = get_file_statistics(all_files)
@@ -66,7 +60,7 @@ def main() -> int:
         # Log summary
         logging.info(f"\nSummary:")
         logging.info(f"Found {len(all_files):,} files to include")
-        logging.info(f"Ignored {len(ignored_files):,} files based on patterns")
+        logging.info(f"Ignored {len(ignored_files):,} files")
         logging.info(f"Skipped {len(binary_files):,} binary files")
         logging.info(f"Total size to process: {total_size / (1024*1024):.2f} MB")
         
@@ -83,7 +77,7 @@ def main() -> int:
             for f, reason in sorted(ignored_files):
                 logging.debug(f"  {f} ({reason})")
             logging.debug("\nBinary files:")
-            for f, reason in sorted(binary_files):  # binary_files already contains tuples of (path, reason)
+            for f, reason in sorted(binary_files):
                 logging.debug(f"  {f} ({reason})")
 
         if not all_files:

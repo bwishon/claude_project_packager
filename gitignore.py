@@ -1,107 +1,74 @@
-import logging
-import fnmatch
+#!/usr/bin/env python3
+
+import subprocess
 from pathlib import Path
-from typing import List, Tuple, Dict
+import logging
+from typing import List, Tuple
 
-class GitignorePattern:
-    """Class to handle gitignore pattern matching."""
-    def __init__(self, pattern: str):
-        self.original = pattern
-        self.pattern = pattern.rstrip('/')
-        self.is_dir_only = pattern.endswith('/')
-        self.is_negation = pattern.startswith('!')
-        self.is_absolute = pattern.startswith('/')
-        
-        if self.is_negation:
-            self.pattern = self.pattern[1:]
-        if self.is_absolute:
-            self.pattern = self.pattern[1:]
-            
-    def matches(self, path: str) -> bool:
-        """Check if path matches this pattern."""
-        path = path.replace('\\', '/')
-        
-        # Handle directory-only patterns
-        if self.is_dir_only and not path.endswith('/'):
-            path = path + '/'
-        
-        # Log the exact pattern and path being checked
-        logging.debug(f"  Checking '{path}' against pattern '{self.pattern}'")
-        
-        # Handle absolute paths
-        if self.is_absolute:
-            result = fnmatch.fnmatch(path, self.pattern)
-            logging.debug(f"    Absolute path match: {result}")
-            return result
-        
-        # Handle the path both with and without a leading slash
-        normalized_path = path.lstrip('/')
-        pattern_with_slash = f"**/{self.pattern}"
-        
-        match1 = fnmatch.fnmatch(normalized_path, self.pattern)
-        match2 = fnmatch.fnmatch(normalized_path, pattern_with_slash)
-        
-        logging.debug(f"    Direct pattern match: {match1}")
-        logging.debug(f"    With **/ prefix match: {match2}")
-        
-        return match1 or match2
-
-def parse_gitignore(gitignore_path: Path) -> List[str]:
-    """Parse .gitignore file and return list of patterns."""
-    patterns = []
+def batch_check_ignore(root_dir: Path, files: List[Path], batch_size: int = 1000) -> List[Tuple[Path, str]]:
+    """Check multiple files against gitignore patterns using git check-ignore.
+    Returns list of (path, reason) tuples for ignored files."""
+    ignored_files = []
     
-    if not gitignore_path.exists():
-        logging.debug("No .gitignore found, only .git directory will be ignored")
-        return patterns
-        
+    # Convert root_dir to git repository root
     try:
-        with open(gitignore_path, 'r', encoding='utf-8') as f:
-            for line in f:
-                line = line.split('#')[0].strip()
-                if line:  # Skip empty lines and comments
-                    patterns.append(line)
-                    
-        logging.debug(f"Parsed {len(patterns)} patterns from .gitignore:")
-        for pattern in patterns:
-            logging.debug(f"  {pattern}")
+        repo_root = subprocess.run(
+            ['git', 'rev-parse', '--show-toplevel'],
+            cwd=root_dir,
+            capture_output=True,
+            text=True,
+            check=True
+        ).stdout.strip()
+        root_dir = Path(repo_root)
+    except subprocess.SubprocessError:
+        logging.warning("Not a git repository root, using specified directory")
+    
+    # Process files in batches to avoid command line length limits
+    for i in range(0, len(files), batch_size):
+        batch = files[i:i + batch_size]
+        rel_paths = [str(f.relative_to(root_dir)) for f in batch]
+        
+        try:
+            # Use git check-ignore with -v for verbose output
+            result = subprocess.run(
+                ['git', 'check-ignore', '-v', '--no-index', '--'] + rel_paths,
+                cwd=root_dir,
+                capture_output=True,
+                text=True
+            )
             
-    except Exception as e:
-        logging.error(f"Error reading .gitignore: {e}")
-        
-    return patterns
+            # Parse output: format is "pattern	file"
+            for line in result.stdout.splitlines():
+                if not line:
+                    continue
+                try:
+                    pattern, file = line.split('\t')
+                    ignored_files.append((Path(file), f"Matches pattern: {pattern}"))
+                except ValueError:
+                    logging.warning(f"Unexpected git check-ignore output: {line}")
+                    
+        except subprocess.SubprocessError as e:
+            logging.error(f"Error running git check-ignore: {e}")
+            break
+    
+    return ignored_files
 
-def should_ignore(path: str, ignore_patterns: List[str]) -> Tuple[bool, str]:
-    """Check if path matches any gitignore patterns. Returns (should_ignore, reason)."""
-    logging.debug(f"\nChecking if should ignore: {path}")
-    
-    # Always ignore .git directory
-    if '.git' in Path(path).parts:
-        logging.debug("  Ignoring .git directory")
-        return True, "Git repository files"
-    
-    # Convert patterns to GitignorePattern objects
-    patterns = [GitignorePattern(p) for p in ignore_patterns]
-    path = str(path)
-    
-    # Keep track of matched patterns
-    matching_pattern = None
-    should_ignore = False
-    
-    logging.debug(f"  Testing against {len(patterns)} patterns:")
-    for pattern in patterns:
-        logging.debug(f"\n  Pattern: {pattern.original}")
-        logging.debug(f"    Is dir only: {pattern.is_dir_only}")
-        logging.debug(f"    Is absolute: {pattern.is_absolute}")
-        logging.debug(f"    Is negation: {pattern.is_negation}")
+def should_ignore(path: str, root_dir: Path) -> Tuple[bool, str]:
+    """Check if a single path should be ignored using git check-ignore."""
+    try:
+        result = subprocess.run(
+            ['git', 'check-ignore', '-v', '--no-index', '--', path],
+            cwd=root_dir,
+            capture_output=True,
+            text=True
+        )
         
-        if pattern.matches(path):
-            logging.debug(f"    MATCHED")
-            matching_pattern = pattern.original
-            should_ignore = not pattern.is_negation
-        else:
-            logging.debug(f"    Did not match")
-    
-    if should_ignore and matching_pattern:
-        return True, f"Matches pattern: {matching_pattern}"
+        if result.returncode == 0:  # File is ignored
+            pattern = result.stdout.split('\t')[0]
+            return True, f"Matches pattern: {pattern}"
+            
+        return False, ""
         
-    return False, ""
+    except subprocess.SubprocessError as e:
+        logging.error(f"Error checking ignore status: {e}")
+        return False, ""

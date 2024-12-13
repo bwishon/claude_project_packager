@@ -2,8 +2,8 @@ import mimetypes
 from pathlib import Path
 from typing import List, Tuple
 import logging
-from gitignore import should_ignore
 from core import MAX_FILE_SIZE
+from gitignore import batch_check_ignore
 
 def is_binary_file(file_path: str) -> Tuple[bool, str]:
     """Check if file is binary. Returns (is_binary, reason)."""
@@ -64,66 +64,46 @@ def create_file_batch(root_dir: Path, files: List[Path], start_idx: int, max_cha
         
     return batch_files, current_idx
 
-def scan_directory(root_dir: Path, ignore_patterns: List[str], start_dir: Path = None) -> Tuple[List[Path], List[Tuple[str, str]], List[Tuple[str, str]]]:
+def scan_directory(root_dir: Path) -> Tuple[List[Path], List[Tuple[str, str]], List[Tuple[str, str]]]:
     """Scan directory and categorize files."""
     all_files = []
-    ignored_files = []
     binary_files = []
+    explicit_ignores = []
     
     logging.debug("\nStarting directory scan...")
     logging.debug(f"Root dir: {root_dir}")
-    logging.debug(f"Start dir: {start_dir if start_dir else 'same as root'}")
-    logging.debug("Found files before filtering:")
     
-    # First, just list all files found
-    scan_root = start_dir if start_dir else root_dir
-    all_found_files = list(scan_root.rglob('*'))
-    for path in all_found_files:
+    # First collect all files except .git directory and .gitignore
+    for path in root_dir.rglob('*'):
         if path.is_file():
-            logging.debug(f"Found file: {path}")
-            
-    # Now process each file
-    for path in all_found_files:
-        if not path.is_file():
-            continue
-            
-        try:
-            rel_path = str(path.relative_to(root_dir))
-            logging.debug(f"\nProcessing file: {rel_path}")
-            logging.debug(f"Absolute path: {path}")
-            
-            # Check gitignore patterns
-            logging.debug("Checking gitignore patterns:")
-            should_ignore_file, ignore_reason = should_ignore(rel_path, ignore_patterns)
-            if should_ignore_file:
-                ignored_files.append((rel_path, ignore_reason))
-                logging.debug(f"IGNORED: {rel_path} ({ignore_reason})")
+            if '.git' in path.parts:
                 continue
-            else:
-                logging.debug(f"Not ignored by any pattern")
-            
-            # Check for binary files
-            logging.debug("Checking if binary:")
-            is_binary, binary_reason = is_binary_file(str(path))
-            if is_binary:
-                binary_files.append((rel_path, binary_reason))
-                logging.debug(f"BINARY: {rel_path} ({binary_reason})")
+            if path.name == '.gitignore':
+                explicit_ignores.append((str(path.relative_to(root_dir)), "Configuration file"))
                 continue
-            else:
-                logging.debug("Not binary")
-            
-            # If we get here, the file should be included
-            logging.debug(f"INCLUDING: {rel_path}")
             all_files.append(path)
             
-        except Exception as e:
-            logging.error(f"Error processing {path}: {e}")
-            logging.exception("Full traceback:")
-            continue
+    # Use git check-ignore to find ignored files
+    ignored_files = batch_check_ignore(root_dir, all_files)
+    ignored_paths = {path for path, _ in ignored_files}
+    
+    # Combine git-ignored files with our explicit ignores
+    ignored_files.extend(explicit_ignores)
+    
+    # Filter out ignored files and check remaining for binary content
+    included_files = []
+    for path in all_files:
+        if path not in ignored_paths:
+            is_binary, reason = is_binary_file(str(path))
+            if is_binary:
+                binary_files.append((str(path.relative_to(root_dir)), reason))
+                continue
+            included_files.append(path)
     
     logging.debug(f"\nScan complete.")
-    logging.debug(f"Found {len(all_found_files)} total files")
-    logging.debug(f"Including {len(all_files)} files")
+    logging.debug(f"Found {len(all_files)} total files")
+    logging.debug(f"Including {len(included_files)} files")
     logging.debug(f"Ignored {len(ignored_files)} files")
     logging.debug(f"Binary {len(binary_files)} files")
-    return all_files, ignored_files, binary_files
+    
+    return included_files, ignored_files, binary_files

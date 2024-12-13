@@ -11,7 +11,7 @@ from typing import List, Set, Tuple
 # Constants for file processing
 MAX_TOKENS_PER_MESSAGE = 100000
 CHARS_PER_TOKEN = 4
-MAX_FILE_SIZE = 50000
+MAX_FILE_SIZE = 100000
 
 def setup_logging(verbose: bool = False, log_file: str = None):
     """Setup logging to both console and file if specified."""
@@ -49,6 +49,4 @@ def parse_arguments():
                        help='Write detailed logs to specified file')
     parser.add_argument('--max-file-size', type=int, default=MAX_FILE_SIZE,
                        help=f'Maximum size of individual files to include (bytes, default: {MAX_FILE_SIZE})')
-    parser.add_argument('--workers', type=int, default=os.cpu_count(),
-                       help='Number of worker processes for parallel scanning')
     return parser.parse_args()
