@@ -35,11 +35,13 @@ DEFAULT_NODE_PATTERNS = [
     'wrangler.toml.backup'
 ]
 
-def setup_logging(log_file: str = None):
+def setup_logging(verbose: bool = False, log_file: str = None):
     """Setup logging to both console and file if specified."""
+    log_level = logging.DEBUG if verbose else logging.INFO
+    
     console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.INFO)
-    console_formatter = logging.Formatter('%(levelname)s: %(message)s')
+    console_handler.setLevel(log_level)
+    console_formatter = logging.Formatter('%(message)s')
     console_handler.setFormatter(console_formatter)
 
     root_logger = logging.getLogger()
@@ -63,8 +65,16 @@ def parse_arguments():
                        help='Project directory to package (default: current directory)')
     parser.add_argument('-o', '--output', default='claude_project.xml', 
                        help='Output XML file name (default: claude_project.xml)')
-    parser.add_argument('-v', '--verbose', metavar='LOG_FILE',
-                       help='Enable verbose logging to specified file')
+    parser.add_argument('-v', '--verbose', action='store_true',
+                       help='Enable verbose output')
+    parser.add_argument('--log-file', metavar='FILE',
+                       help='Write detailed logs to specified file')
     parser.add_argument('--no-defaults', action='store_true',
                        help='Do not include default Node.js ignore patterns')
+    parser.add_argument('--max-file-size', type=int, default=MAX_FILE_SIZE,
+                       help=f'Maximum size of individual files to include (bytes, default: {MAX_FILE_SIZE})')
+    parser.add_argument('--exclude-types', type=str, nargs='+',
+                       help='File extensions to exclude (e.g., .jpg .png)')
+    parser.add_argument('--workers', type=int, default=os.cpu_count(),
+                       help='Number of worker processes for parallel scanning')
     return parser.parse_args()
