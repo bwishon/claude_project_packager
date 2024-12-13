@@ -5,9 +5,7 @@ import logging
 import sys
 import os
 import xml.etree.ElementTree as ET
-from multiprocessing import Pool
 from tqdm import tqdm
-from typing import Set
 
 from core import (
     setup_logging,
@@ -19,16 +17,8 @@ from gitignore import parse_gitignore, should_ignore
 from file_processing import scan_directory, create_file_batch
 from xml_generator import create_xml_document
 
-def scan_files_parallel(root_dir: Path, chunk: Path, ignore_patterns: list, exclude_types: Set[str] = None) -> tuple:
-    """Scan a chunk of the directory in parallel."""
-    try:
-        return scan_directory(root_dir, ignore_patterns, start_dir=chunk, exclude_types=exclude_types)
-    except Exception as e:
-        logging.error(f"Error scanning {chunk}: {e}")
-        return [], [], []
-
 def get_file_statistics(files: list) -> tuple:
-    """Generate statistics about the files to be processed."""
+    """Generate statistics about the files."""
     file_types = {}
     total_size = 0
     
@@ -38,36 +28,6 @@ def get_file_statistics(files: list) -> tuple:
         total_size += f.stat().st_size
         
     return file_types, total_size
-
-def validate_output(output_path: Path) -> None:
-    """Validate the generated XML file."""
-    if not output_path.exists():
-        raise ValueError(f"Output file not created: {output_path}")
-        
-    if output_path.stat().st_size == 0:
-        raise ValueError(f"Created file is empty: {output_path}")
-        
-    try:
-        ET.parse(output_path)
-    except ET.ParseError as e:
-        raise ValueError(f"Created XML is invalid: {e}")
-
-def process_file_batch(root_dir: Path, batch_files: list, ignored_files: list, 
-                      output_file: Path, batch_num: int = None) -> Path:
-    """Process a batch of files and create XML document."""
-    try:
-        output_path = create_xml_document(
-            root_dir,
-            batch_files,
-            ignored_files,
-            output_file,
-            batch_num
-        )
-        validate_output(output_path)
-        return output_path
-    except Exception as e:
-        logging.error(f"Failed to create XML document: {e}")
-        raise
 
 def main() -> int:
     """Main execution flow for project packaging."""
@@ -82,9 +42,6 @@ def main() -> int:
         # Setup logging
         setup_logging(args.verbose, args.log_file)
 
-        # Convert exclude_types to set with dots
-        exclude_types = {f'.{ext.lstrip(".")}' for ext in args.exclude_types} if args.exclude_types else set()
-
         # Validate and resolve project directory
         root_dir = Path(args.project_dir).resolve()
         output_file = Path(args.output)
@@ -95,26 +52,13 @@ def main() -> int:
             
         # Parse gitignore patterns
         gitignore = root_dir / '.gitignore'
-        ignore_patterns = parse_gitignore(gitignore, not args.no_defaults)
+        ignore_patterns = parse_gitignore(gitignore)
         
         logging.info(f"Scanning directory: {root_dir}")
         
-        # Scan directory in parallel
-        with Pool(args.workers) as pool:
-            chunks = list(root_dir.iterdir())
-            results = pool.starmap(
-                scan_files_parallel,
-                [(root_dir, chunk, ignore_patterns, exclude_types) for chunk in chunks]
-            )
-        
-        # Combine results
-        all_files = []
-        ignored_files = []
-        binary_files = []
-        for r in results:
-            all_files.extend(r[0])
-            ignored_files.extend(r[1])
-            binary_files.extend(r[2])
+        # Scan directory for files
+        logging.debug("\nStarting file scan...")
+        all_files, ignored_files, binary_files = scan_directory(root_dir, ignore_patterns)
         
         # Get file statistics
         file_types, total_size = get_file_statistics(all_files)
@@ -139,11 +83,12 @@ def main() -> int:
             for f, reason in sorted(ignored_files):
                 logging.debug(f"  {f} ({reason})")
             logging.debug("\nBinary files:")
-            for f, reason in sorted(binary_files):
+            for f, reason in sorted(binary_files):  # binary_files already contains tuples of (path, reason)
                 logging.debug(f"  {f} ({reason})")
-        
-        # Sort files for consistent output
-        all_files.sort()
+
+        if not all_files:
+            logging.error("No files found to include!")
+            return 1
         
         # Process files in batches if needed
         max_chars = MAX_TOKENS_PER_MESSAGE * CHARS_PER_TOKEN
@@ -169,49 +114,35 @@ def main() -> int:
                         start_idx = new_idx
                         pbar.update(new_idx - start_idx)
                         continue
-                        
-                    # Check for duplicates
-                    batch_set = {str(f.relative_to(root_dir)) for f in batch_files}
-                    overlap = batch_set & processed_files
-                    if overlap:
-                        logging.warning(f"Duplicate files detected: {overlap}")
-                        start_idx = new_idx
-                        pbar.update(new_idx - start_idx)
-                        continue
                     
                     # Generate XML for this batch
                     if new_idx < len(all_files):
-                        # More files to come, create numbered batch
-                        output_path = process_file_batch(
-                            root_dir,
-                            batch_files,
-                            ignored_files,
-                            output_file,
+                        output_path = create_xml_document(
+                            root_dir, 
+                            batch_files, 
+                            ignored_files, 
+                            output_file, 
                             batch_num
                         )
                         logging.info(f"Created batch {batch_num}: {output_path}")
                         batch_num += 1
                     else:
-                        # Last/only batch, create without number
-                        output_path = process_file_batch(
-                            root_dir,
-                            batch_files,
-                            ignored_files,
+                        output_path = create_xml_document(
+                            root_dir, 
+                            batch_files, 
+                            ignored_files, 
                             output_file
                         )
                         logging.info(f"Created: {output_path}")
                     
-                    # Track processed files
-                    processed_files.update(batch_set)
+                    start_idx = new_idx
+                    pbar.update(new_idx - start_idx)
                     
                 except Exception as e:
                     logging.error(f"Error processing batch: {e}")
                     if args.verbose:
                         logging.exception("Full traceback:")
                     return 1
-                
-                start_idx = new_idx
-                pbar.update(new_idx - start_idx)
         
         return 0
         

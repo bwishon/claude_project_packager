@@ -13,28 +13,6 @@ MAX_TOKENS_PER_MESSAGE = 100000
 CHARS_PER_TOKEN = 4
 MAX_FILE_SIZE = 50000
 
-# Node.js specific patterns
-DEFAULT_NODE_PATTERNS = [
-    'node_modules/',
-    'npm-debug.log',
-    'yarn-debug.log*',
-    'yarn-error.log*',
-    '.pnpm-debug.log*',
-    '.npm',
-    '.env',
-    '.env.*',
-    '.DS_Store',
-    'coverage/',
-    '.next/',
-    'build/',
-    'dist/',
-    '*.tsbuildinfo',
-    '.vercel',
-    '.worker/',
-    '.cloudflare/',
-    'wrangler.toml.backup'
-]
-
 def setup_logging(verbose: bool = False, log_file: str = None):
     """Setup logging to both console and file if specified."""
     log_level = logging.DEBUG if verbose else logging.INFO
@@ -69,12 +47,8 @@ def parse_arguments():
                        help='Enable verbose output')
     parser.add_argument('--log-file', metavar='FILE',
                        help='Write detailed logs to specified file')
-    parser.add_argument('--no-defaults', action='store_true',
-                       help='Do not include default Node.js ignore patterns')
     parser.add_argument('--max-file-size', type=int, default=MAX_FILE_SIZE,
                        help=f'Maximum size of individual files to include (bytes, default: {MAX_FILE_SIZE})')
-    parser.add_argument('--exclude-types', type=str, nargs='+',
-                       help='File extensions to exclude (e.g., .jpg .png)')
     parser.add_argument('--workers', type=int, default=os.cpu_count(),
                        help='Number of worker processes for parallel scanning')
     return parser.parse_args()
