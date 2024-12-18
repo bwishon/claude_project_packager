@@ -1,0 +1,25 @@
+[tool.poetry]
+name = "project-packager"
+version = "0.2.0"
+description = "A tool for packaging project files into XML format for analysis by large language models"
+authors = ["William Wishon <bill@wishon.org>"]
+readme = "README.md"
+packages = [{include = "project_packager"}]
+license = "Apache-2.0"
+
+[tool.poetry.dependencies]
+python = "^3.8"
+tqdm = "^4.66.1"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.0"
+black = "^23.7.0"
+pylint = "^3.0.0"
+mypy = "^1.5.0"
+
+[tool.poetry.scripts]
+project-packager = "project_packager.__main__:main"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

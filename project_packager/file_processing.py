@@ -2,8 +2,8 @@ import mimetypes
 from pathlib import Path
 from typing import List, Tuple
 import logging
-from core import MAX_FILE_SIZE
-from gitignore import batch_check_ignore
+from .core import MAX_FILE_SIZE
+from .gitignore import batch_check_ignore
 
 def is_binary_file(file_path: str) -> Tuple[bool, str]:
     """Check if file is binary. Returns (is_binary, reason)."""

@@ -6,14 +6,14 @@ import sys
 import os
 from tqdm import tqdm
 
-from core import (
+from .core import (
     setup_logging,
     parse_arguments,
     MAX_TOKENS_PER_MESSAGE,
     CHARS_PER_TOKEN
 )
-from file_processing import scan_directory, create_file_batch
-from xml_generator import create_xml_document
+from .file_processing import scan_directory, create_file_batch
+from .xml_generator import create_xml_document
 
 def get_file_statistics(files: list) -> tuple:
     """Generate statistics about the files."""
