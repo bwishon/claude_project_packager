@@ -10,9 +10,29 @@ from typing import List, Tuple, Dict
 import os
 from itertools import chain
 
+class CDATATreeBuilder(ET.TreeBuilder):
+    """Custom TreeBuilder that handles CDATA sections."""
+    def __init__(self):
+        super().__init__()
+        self._data_parts = []
+
+    def start(self, tag, attrs):
+        self._data_parts = []  # Reset data parts for new element
+        return super().start(tag, attrs)
+
+    def data(self, data):
+        self._data_parts.append(data)
+
+    def end(self, tag):
+        text = ''.join(self._data_parts)
+        if text and tag == 'content':  # Only wrap content elements in CDATA
+            elem = super().end(tag)
+            elem.text = f'<![CDATA[{text}]]>'
+            return elem
+        return super().end(tag)
+
 def get_mime_type(file_path: Path) -> str:
     """Get MIME type for file with enhanced detection."""
-    # Initialize mimetypes database with additional types
     if not mimetypes.inited:
         mimetypes.init()
         
@@ -26,7 +46,6 @@ def get_mime_type(file_path: Path) -> str:
     
     mime_type, _ = mimetypes.guess_type(str(file_path))
     
-    # Handle special cases
     if not mime_type:
         ext = file_path.suffix.lower()
         if ext in {'.svelte', '.vue'}:
@@ -86,20 +105,15 @@ def create_directory_element(directories: Dict[str, int]) -> ET.Element:
         
     return structure
 
-def escape_xml_content(content: str) -> str:
-    """Escape potentially problematic characters in XML content."""
-    # Replace any invalid XML characters with their Unicode escape sequence
-    return ''.join(char if 0x20 <= ord(char) <= 0xD7FF or 0xE000 <= ord(char) <= 0xFFFD else f'&#x{ord(char):04x};'
-                  for char in content)
-
 def create_files_element(root_dir: Path, files: List[Path]) -> ET.Element:
-    """Create files section of XML document with improved error handling."""
+    """Create files section of XML document."""
     files_elem = ET.Element("files")
     
     for idx, file_path in enumerate(sorted(files), 1):
         try:
             rel_path = file_path.relative_to(root_dir)
             stats = file_path.stat()
+            mime_type = get_mime_type(file_path)
             
             file_elem = ET.SubElement(files_elem, "file")
             file_elem.set("index", str(idx))
@@ -107,24 +121,16 @@ def create_files_element(root_dir: Path, files: List[Path]) -> ET.Element:
             file_elem.set("size", str(stats.st_size))
             file_elem.set("modified", datetime.fromtimestamp(stats.st_mtime).isoformat())
             file_elem.set("extension", rel_path.suffix[1:] if rel_path.suffix else '')
-            file_elem.set("mime_type", get_mime_type(file_path))
+            file_elem.set("mime_type", mime_type)
             
             ET.SubElement(file_elem, "name").text = rel_path.name
             ET.SubElement(file_elem, "path").text = rel_path.as_posix()
             
             content_elem = ET.SubElement(file_elem, "content")
             
-            # Read file content in chunks if it's large
             try:
-                if stats.st_size > 1024 * 1024:  # 1MB
-                    content = []
-                    with open(file_path, 'r', encoding='utf-8') as f:
-                        while chunk := f.read(8192):
-                            content.append(escape_xml_content(chunk))
-                    content_elem.text = ''.join(content)
-                else:
-                    with open(file_path, 'r', encoding='utf-8') as f:
-                        content_elem.text = escape_xml_content(f.read())
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    content_elem.text = f.read()
             except UnicodeDecodeError:
                 logging.warning(f"Skipping content for {file_path} - unable to read as text")
                 content_elem.set("error", "Unable to read file as text")
@@ -139,17 +145,23 @@ def create_files_element(root_dir: Path, files: List[Path]) -> ET.Element:
             continue
             
     return files_elem
-    
+
 def write_xml(root: ET.Element, output_path: Path) -> None:
-    """Write XML to file with validation and error handling."""
+    """Write XML to file with CDATA handling."""
     temp_path = output_path.with_suffix('.tmp')
     try:
-        # Validate XML structure
+        # Convert to string, keeping original text content
         xml_str = ET.tostring(root, encoding='unicode')
-        xml.dom.minidom.parseString(xml_str)  # Validate XML syntax
         
-        # Pretty print with improved formatting
-        dom = xml.dom.minidom.parseString(xml_str)
+        # Create new tree with CDATA handling
+        parser = ET.XMLParser(target=CDATATreeBuilder())
+        new_root = ET.XML(xml_str, parser=parser)
+        
+        # Convert back to string with CDATA preserved
+        final_xml = ET.tostring(new_root, encoding='unicode')
+        
+        # Pretty print
+        dom = xml.dom.minidom.parseString(final_xml)
         pretty_xml = dom.toprettyxml(indent='  ', encoding='utf-8')
         
         # Write to temporary file first
@@ -160,18 +172,16 @@ def write_xml(root: ET.Element, output_path: Path) -> None:
         try:
             temp_path.replace(output_path)
         except OSError:
-            # On Windows, may need to remove existing file first
             if output_path.exists():
                 output_path.unlink()
             temp_path.rename(output_path)
             
     except Exception as e:
-        # Clean up temp file if it exists
         if temp_path.exists():
             try:
                 temp_path.unlink()
             except OSError:
-                pass  # Ignore cleanup errors
+                pass
         raise ValueError(f"Failed to write XML file: {e}")
 
 def create_xml_document(root_dir: Path, files: List[Path], ignored_files: List[Tuple[str, str]], 
