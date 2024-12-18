@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import xml.etree.ElementTree as ET
-import xml.dom.minidom
+from xml.dom import minidom
 from pathlib import Path
 from datetime import datetime
 import logging
@@ -157,17 +157,22 @@ def write_xml(root: ET.Element, output_path: Path) -> None:
         parser = ET.XMLParser(target=CDATATreeBuilder())
         new_root = ET.XML(xml_str, parser=parser)
         
-        # Convert back to string with CDATA preserved
-        final_xml = ET.tostring(new_root, encoding='unicode')
+        # Pretty print with CDATA preserved
+        rough_string = ET.tostring(new_root, 'unicode')
+        reparsed = minidom.parseString(rough_string)
         
-        # Pretty print
-        dom = xml.dom.minidom.parseString(final_xml)
-        pretty_xml = dom.toprettyxml(indent='  ', encoding='utf-8')
-        
-        # Write to temporary file first
-        with open(temp_path, 'wb') as f:
-            f.write(pretty_xml)
+        # Use a custom writer to handle CDATA
+        class CustomWriter:
+            def __init__(self, stream):
+                self.stream = stream
             
+            def write(self, data):
+                self.stream.write(data.replace("&lt;![CDATA[", "<![CDATA[").replace("]]&gt;", "]]>"))
+        
+        with open(temp_path, 'w', encoding='utf-8') as f:
+            custom_writer = CustomWriter(f)
+            reparsed.writexml(custom_writer, indent='  ', newl='\n', encoding='utf-8')
+        
         # Rename temporary file to final output
         try:
             temp_path.replace(output_path)
@@ -183,7 +188,7 @@ def write_xml(root: ET.Element, output_path: Path) -> None:
             except OSError:
                 pass
         raise ValueError(f"Failed to write XML file: {e}")
-
+        
 def create_xml_document(root_dir: Path, files: List[Path], ignored_files: List[Tuple[str, str]], 
                        output_file: Path, part: int = None) -> Path:
     """Create XML document containing file contents and directory structure."""
