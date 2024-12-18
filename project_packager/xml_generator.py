@@ -86,6 +86,12 @@ def create_directory_element(directories: Dict[str, int]) -> ET.Element:
         
     return structure
 
+def escape_xml_content(content: str) -> str:
+    """Escape potentially problematic characters in XML content."""
+    # Replace any invalid XML characters with their Unicode escape sequence
+    return ''.join(char if 0x20 <= ord(char) <= 0xD7FF or 0xE000 <= ord(char) <= 0xFFFD else f'&#x{ord(char):04x};'
+                  for char in content)
+
 def create_files_element(root_dir: Path, files: List[Path]) -> ET.Element:
     """Create files section of XML document with improved error handling."""
     files_elem = ET.Element("files")
@@ -114,11 +120,11 @@ def create_files_element(root_dir: Path, files: List[Path]) -> ET.Element:
                     content = []
                     with open(file_path, 'r', encoding='utf-8') as f:
                         while chunk := f.read(8192):
-                            content.append(chunk)
+                            content.append(escape_xml_content(chunk))
                     content_elem.text = ''.join(content)
                 else:
                     with open(file_path, 'r', encoding='utf-8') as f:
-                        content_elem.text = f.read()
+                        content_elem.text = escape_xml_content(f.read())
             except UnicodeDecodeError:
                 logging.warning(f"Skipping content for {file_path} - unable to read as text")
                 content_elem.set("error", "Unable to read file as text")
@@ -133,9 +139,10 @@ def create_files_element(root_dir: Path, files: List[Path]) -> ET.Element:
             continue
             
     return files_elem
-
+    
 def write_xml(root: ET.Element, output_path: Path) -> None:
     """Write XML to file with validation and error handling."""
+    temp_path = output_path.with_suffix('.tmp')
     try:
         # Validate XML structure
         xml_str = ET.tostring(root, encoding='unicode')
@@ -146,7 +153,6 @@ def write_xml(root: ET.Element, output_path: Path) -> None:
         pretty_xml = dom.toprettyxml(indent='  ', encoding='utf-8')
         
         # Write to temporary file first
-        temp_path = output_path.with_suffix('.tmp')
         with open(temp_path, 'wb') as f:
             f.write(pretty_xml)
             
@@ -160,8 +166,12 @@ def write_xml(root: ET.Element, output_path: Path) -> None:
             temp_path.rename(output_path)
             
     except Exception as e:
+        # Clean up temp file if it exists
         if temp_path.exists():
-            temp_path.unlink()
+            try:
+                temp_path.unlink()
+            except OSError:
+                pass  # Ignore cleanup errors
         raise ValueError(f"Failed to write XML file: {e}")
 
 def create_xml_document(root_dir: Path, files: List[Path], ignored_files: List[Tuple[str, str]], 
