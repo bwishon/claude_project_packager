@@ -1,13 +1,13 @@
 # Project Packager
 
-A Python utility for packaging project files into XML format for analysis by large language models like Claude. The tool intelligently handles file scanning, content extraction, and batch processing while respecting `.gitignore` rules.
+A Python utility for packaging project files into JSON format for analysis by large language models like Claude. The tool intelligently handles file scanning, content extraction, and batch processing while respecting `.gitignore` rules.
 
 ## Overview
 
 Project Packager is designed to help you prepare your codebase for analysis by large language models. It:
-- Scans your project directory and creates a structured XML representation
+- Scans your project directory and creates a structured JSON representation
+- Handles both text and supported binary files (images, audio, video)
 - Respects `.gitignore` patterns to exclude unnecessary files
-- Handles binary files and large codebases intelligently
 - Preserves directory structure and file metadata
 - Splits output into manageable chunks if needed
 
@@ -40,7 +40,7 @@ Arguments:
   project_dir            Project directory to package (default: current directory)
 
 Options:
-  -o, --output          Output XML file name (default: claude_project.xml)
+  -o, --output          Output JSON file name (default: claude_project.json)
   -v, --verbose         Enable verbose output
   -vv, --very-verbose   Enable very verbose debug output
   --log-file FILE       Write detailed logs to specified file
@@ -56,7 +56,7 @@ project-packager
 
 Package a specific project with custom output:
 ```bash
-project-packager /path/to/project -o output.xml
+project-packager /path/to/project -o output.json
 ```
 
 Enable verbose logging with file output:
@@ -68,9 +68,19 @@ project-packager . -v --log-file=packager.log
 
 ### Smart File Processing
 - Uses Git's `check-ignore` for robust ignore pattern handling
-- Detects and skips binary files automatically
+- Intelligently processes binary files:
+  - Base64 encodes supported formats (images, audio, video)
+  - Automatically skips unsupported binary files
 - Handles large files through efficient chunked reading
 - Processes files in batches to respect token limits
+
+### Supported Binary Formats
+The tool automatically detects and includes these binary formats:
+- Images: .png, .jpg, .jpeg, .gif
+- Audio: .mp3, .wav, .ogg
+- Video: .mp4, .avi, .mov
+
+These files are base64 encoded in the output JSON for compatibility with large language models.
 
 ### Comprehensive Metadata
 - File system structure preservation
@@ -82,48 +92,65 @@ project-packager . -v --log-file=packager.log
 - Graceful handling of encoding issues
 - Safe file writing with atomic operations
 - Detailed error reporting and logging
-- XML validation before output
+- JSON schema validation
 
 ## Output Format
 
-The tool generates an XML document with the following structure:
+The tool generates a JSON document with the following structure:
 
-```xml
-<?xml version="1.0" encoding="utf-8"?>
-<documents>
-    <metadata>
-        <root_directory>/path/to/your/project</root_directory>
-        <file_count>42</file_count>
-        <total_size>123456</total_size>
-        <creation_date>2024-12-18T11:22:00.357677</creation_date>
-    </metadata>
-    <directory_structure>
-        <directory path="src" file_count="15"/>
-        <directory path="src/utils" file_count="5"/>
-        <directory path="tests" file_count="8"/>
-    </directory_structure>
-    <files>
-        <file index="1" directory="src" size="1234" modified="2024-12-18T10:00:00" extension="py" mime_type="text/x-python">
-            <name>main.py</name>
-            <path>src/main.py</path>
-            <content>#!/usr/bin/env python3
-                
-def main():
-    print("Hello, World!")
-
-if __name__ == "__main__":
-    main()</content>
-        </file>
-        <!-- Additional files... -->
-    </files>
-</documents>
+```json
+{
+  "metadata": {
+    "root_directory": "/path/to/your/project",
+    "file_count": 42,
+    "total_size": 123456,
+    "creation_date": "2024-12-18T11:22:00.357677"
+  },
+  "directory_structure": [
+    {
+      "path": "src",
+      "file_count": 15
+    },
+    {
+      "path": "src/utils",
+      "file_count": 5
+    }
+  ],
+  "files": [
+    {
+      "index": 1,
+      "directory": "src",
+      "name": "main.py",
+      "path": "src/main.py",
+      "size": 1234,
+      "modified": "2024-12-18T10:00:00",
+      "extension": "py",
+      "mime_type": "text/x-python",
+      "content": "#!/usr/bin/env python3\n\ndef main():\n    print(\"Hello, World!\")\n\nif __name__ == \"__main__\":\n    main()"
+    },
+    {
+      "index": 2,
+      "directory": "assets",
+      "name": "logo.png",
+      "path": "assets/logo.png",
+      "size": 5678,
+      "modified": "2024-12-18T10:00:00",
+      "extension": "png",
+      "mime_type": "image/png",
+      "content_base64": "iVBORw0KGgoAAAANSUhEUgAA..."
+    }
+  ]
+}
 ```
+
+Text files use the `content` field, while binary files use `content_base64` for their base64-encoded data.
 
 ## File Handling
 
 The tool automatically:
 - Respects `.gitignore` patterns using Git's native ignore checking
-- Skips binary files (executables, images, etc.)
+- Base64 encodes supported binary files (images, audio, video)
+- Skips unsupported binary files
 - Handles large files by reading in chunks
 - Splits output into multiple files if needed to respect token limits
 - Preserves file metadata and directory structure
@@ -155,8 +182,6 @@ To contribute to the project:
 - Git (for `.gitignore` support)
 
 ## License
-
-This project is licensed under the Apache License 2.0.
 
 ```
 Copyright 2024 William Wishon

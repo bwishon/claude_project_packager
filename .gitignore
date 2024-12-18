@@ -1,4 +1,4 @@
 __pycache__/
 *.pyc
-claude_project.xml
+claude_project.json
 .DS_Store

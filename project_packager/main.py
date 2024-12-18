@@ -12,7 +12,7 @@ from .core import (
     CHARS_PER_TOKEN
 )
 from .file_processing import scan_directory, create_file_batch
-from .xml_generator import create_xml_document
+from .json_generator import create_json_document
 
 def get_file_statistics(files: list) -> tuple:
     """Generate statistics about the files."""
@@ -117,7 +117,7 @@ def main() -> int:
                 
                 # Generate XML for this batch
                 if new_idx < len(all_files):
-                    output_path = create_xml_document(
+                    output_path = create_json_document(
                         root_dir, 
                         batch_files, 
                         ignored_files, 
@@ -127,7 +127,7 @@ def main() -> int:
                     logging.info(f"Created batch {batch_num}: {output_path}")
                     batch_num += 1
                 else:
-                    output_path = create_xml_document(
+                    output_path = create_json_document(
                         root_dir, 
                         batch_files, 
                         ignored_files, 

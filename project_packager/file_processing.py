@@ -9,40 +9,30 @@ from .gitignore import batch_check_ignore
 def log_verbose(message):
     logging.log(15, message)  # 15 is our custom VERBOSE level
 
-def is_binary_file(file_path: str) -> Tuple[bool, str]:
-    """Check if file is binary. Returns (is_binary, reason)."""
-    binary_extensions = {
-        '.pyc', '.pyo', '.so', '.o', '.dll', '.lib', '.dylib', '.exe',
-        '.pdf', '.jpg', '.jpeg', '.png', '.gif', '.ico', '.class',
-        '.bin', '.obj', '.jar', '.pkl', '.pyd', '.wasm', '.br', '.gz'
+def is_binary_file(file_path: str) -> Tuple[bool, bool, str]:
+    """Check if file is binary and if it's a type that Claude can process."""
+    processable_binary_extensions = {
+        '.png', '.jpg', '.jpeg', '.gif',  # Images
+        '.mp3', '.wav', '.ogg',  # Audio
+        '.mp4', '.avi', '.mov'  # Video
     }
     
-    # Check extension
-    if Path(file_path).suffix.lower() in binary_extensions:
-        return True, f"Binary extension: {Path(file_path).suffix}"
-        
-    # Check if it's a minified file
-    if Path(file_path).name.endswith('.min.js') or Path(file_path).name.endswith('.min.css'):
-        return True, "Minified file"
-        
-    # Check for source maps
-    if Path(file_path).name.endswith('.map'):
-        return True, "Source map file"
-
-    # Check content
+    # Check if it's a binary file type that Claude can process
+    if Path(file_path).suffix.lower() in processable_binary_extensions:
+        return True, True, f"Binary file type understood by Claude: {Path(file_path).suffix}"
+    
+    # Check if it's a binary file using the existing logic
     try:
-        with open(file_path, 'rb') as f:
-            chunk = f.read(1024)
-            if b'\0' in chunk:
-                return True, "Contains null bytes"
-    except Exception as e:
-        return True, f"Error reading file: {e}"
-
-    return False, ""
+        with open(file_path, 'tr') as f:
+            f.read(1024)
+        return False, True, "Text file"
+    except:
+        return True, False, "Unprocessable binary file"
 
 def scan_directory(root_dir: Path, very_verbose: bool = False) -> Tuple[List[Path], List[Tuple[str, str]], List[Tuple[str, str]]]:
     """Scan directory and categorize files."""
     all_files = []
+    claude_files = []
     binary_files = []
     explicit_ignores = []
     
@@ -58,7 +48,7 @@ def scan_directory(root_dir: Path, very_verbose: bool = False) -> Tuple[List[Pat
             if path.name == '.gitignore':
                 explicit_ignores.append((str(path.relative_to(root_dir)), "Configuration file"))
                 continue
-            if path.name.startswith('claude_project') and path.suffix == '.xml':
+            if path.name.startswith('claude_project') and path.suffix == '.json':
                 explicit_ignores.append((str(path.relative_to(root_dir)), "Project packager output"))
                 continue
             all_files.append(path)
@@ -119,10 +109,14 @@ def scan_directory(root_dir: Path, very_verbose: bool = False) -> Tuple[List[Pat
         if should_ignore:
             continue
             
-        is_binary, reason = is_binary_file(str(path))
+        is_binary, claude_processable, reason = is_binary_file(str(path))
         if is_binary:
-            binary_files.append((str(rel_path), reason))
-            log_verbose(f"  Skipping binary file: {rel_path} ({reason})")
+            if claude_processable:
+                claude_files.append(path)
+                log_verbose(f"  Including binary file processable by Claude: {rel_path} ({reason})")
+            else:
+                binary_files.append((str(rel_path), reason))
+                log_verbose(f"  Skipping unprocessable binary file: {rel_path} ({reason})")
             continue
             
         included_files.append(path)
@@ -134,7 +128,7 @@ def scan_directory(root_dir: Path, very_verbose: bool = False) -> Tuple[List[Pat
     log_verbose(f"Files ignored: {len(ignored_files)}")
     log_verbose(f"Binary files: {len(binary_files)}")
     
-    return included_files, ignored_files, binary_files
+    return claude_files + included_files, ignored_files, binary_files
 
 def create_file_batch(root_dir: Path, files: List[Path], start_idx: int, max_chars: int, max_file_size: int) -> Tuple[List[Path], int]:
     """Create a batch of files that fits within token limit."""

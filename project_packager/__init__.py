@@ -21,7 +21,7 @@ __author__ = "Your Name"
 # Export commonly used functions
 from .gitignore import batch_check_ignore, should_ignore
 from .file_processing import is_binary_file, scan_directory
-from .xml_generator import create_xml_document
+from .json_generator import create_json_document
 
 __all__ = [
     # Modules
@@ -41,7 +41,7 @@ __all__ = [
     "should_ignore",
     "is_binary_file",
     "scan_directory",
-    "create_xml_document"
+    "create_json_document"
 ]
 
 # Default configuration
