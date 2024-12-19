@@ -7,6 +7,7 @@ import mimetypes
 from typing import List, Tuple, Dict
 import os
 from .mime_types import get_mime_type, get_file_content
+from .git_integration import get_git_metadata
 
 def build_directory_structure(files: List[Path], root_dir: Path) -> List[Dict]:
     """Build directory structure with file counts."""
@@ -34,6 +35,11 @@ def create_metadata(root_dir: Path, files: List[Path], part: int = None) -> Dict
         "creation_date": datetime.now().isoformat()
     }
     
+    # Add Git metadata if available
+    git_metadata = get_git_metadata(root_dir)
+    if git_metadata:
+        metadata["git"] = git_metadata
+    
     if part is not None:
         metadata["part"] = part
         
@@ -42,6 +48,9 @@ def create_metadata(root_dir: Path, files: List[Path], part: int = None) -> Dict
 def create_files_section(root_dir: Path, files: List[Path]) -> List[Dict]:
     """Create files section of JSON document."""
     file_list = []
+    
+    # Get Git metadata once for efficiency
+    git_metadata = get_git_metadata(root_dir)
     
     for idx, file_path in enumerate(sorted(files), 1):
         try:
@@ -59,6 +68,12 @@ def create_files_section(root_dir: Path, files: List[Path]) -> List[Dict]:
                 "extension": rel_path.suffix[1:] if rel_path.suffix else "",
                 "mime_type": mime_type
             }
+            
+            # Add Git history for this file if available
+            if git_metadata and 'files' in git_metadata:
+                file_history = git_metadata['files'].get(str(rel_path))
+                if file_history:
+                    file_data['git_history'] = file_history
             
             content, is_base64, error = get_file_content(file_path, mime_type)
             if error:

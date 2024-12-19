@@ -1,6 +1,6 @@
 # Project Packager
 
-A Python utility for packaging project files into JSON format for analysis by large language models like Claude. The tool intelligently handles file scanning, content extraction, and batch processing while respecting `.gitignore` rules.
+A Python utility for packaging project files into JSON format for analysis by large language models like Claude. The tool intelligently handles file scanning, content extraction, Git metadata collection, and batch processing while respecting `.gitignore` rules.
 
 ## Overview
 
@@ -9,6 +9,7 @@ Project Packager is designed to help you prepare your codebase for analysis by l
 - Handles both text and supported binary files (images, audio, video)
 - Respects `.gitignore` patterns to exclude unnecessary files
 - Preserves directory structure and file metadata
+- Collects Git repository information including recent commits and branches
 - Splits output into manageable chunks if needed
 
 ## Installation
@@ -74,6 +75,13 @@ project-packager . -v --log-file=packager.log
 - Handles large files through efficient chunked reading
 - Processes files in batches to respect token limits
 
+### Git Integration
+- Automatically detects Git repositories
+- Collects recent commit history
+- Includes branch information
+- Captures repository metadata
+- Works seamlessly without Git for non-repository directories
+
 ### Supported Binary Formats
 The tool automatically detects and includes these binary formats:
 - Images: .png, .jpg, .jpeg, .gif
@@ -86,6 +94,7 @@ These files are base64 encoded in the output JSON for compatibility with large l
 - File system structure preservation
 - File metadata (size, modification time, MIME type)
 - Directory statistics and file counts
+- Git repository information
 - Detailed processing logs
 
 ### Robust Error Handling
@@ -104,7 +113,25 @@ The tool generates a JSON document with the following structure:
     "root_directory": "/path/to/your/project",
     "file_count": 42,
     "total_size": 123456,
-    "creation_date": "2024-12-18T11:22:00.357677"
+    "creation_date": "2024-12-18T11:22:00.357677",
+    "git": {
+      "repository_info": {
+        "recent_commits": [
+          {
+            "hash": "abc123...",
+            "author": "Developer Name",
+            "author_email": "dev@example.com",
+            "date": "2024-12-18T10:00:00",
+            "subject": "Commit message",
+            "body": "Full commit description"
+          }
+        ],
+        "branches": {
+          "current": "main",
+          "remotes": ["origin/main", "origin/develop"]
+        }
+      }
+    }
   },
   "directory_structure": [
     {
@@ -155,6 +182,45 @@ The tool automatically:
 - Splits output into multiple files if needed to respect token limits
 - Preserves file metadata and directory structure
 
+### MIME Type Detection
+
+The tool uses a sophisticated MIME type detection system to determine how to handle different files:
+
+#### Core Text MIME Types
+Automatically handles these non-standard text MIME types as text content:
+- Data formats: application/json, application/x-yaml, application/yaml, application/toml, application/xml
+- Web technologies: application/javascript, application/ecmascript, application/graphql
+- Programming languages: application/x-httpd-php, application/x-sh, application/x-ruby, application/x-perl, application/x-python
+- Config and documentation: application/x-config, application/x-markdown
+
+#### Special Filename Handling
+Recognizes common configuration files regardless of extension:
+- Git files: .gitignore, .dockerignore
+- Config files: .editorconfig, .eslintrc, .prettierrc, .babelrc
+- Environment files: .env, .env.local, .env.development
+- Project files: Makefile, Dockerfile, LICENSE, README
+- Version files: .ruby-version, .python-version, .node-version
+
+#### Extension-Based Detection
+Maps specific extensions to appropriate MIME types:
+- Data: .json, .jsonc, .yml, .yaml, .toml, .md
+- Programming: .php, .sh, .rb, .pl, .py
+- Config: .txt, .ini, .cfg, .conf, .properties, .lock, .env
+
+#### Binary Detection
+Implements a two-step binary file detection:
+1. Checks against known binary extensions
+2. Attempts UTF-8 decoding of the first chunk
+   - If decoding succeeds: handles as text
+   - If decoding fails: treats as binary
+
+#### Customization
+MIME type handling can be extended by:
+1. Adding entries to CORE_TEXT_MIME_TYPES in mime_types.py
+2. Updating EXACT_FILENAME_MAPPINGS for specific files
+3. Adding new extensions to EXTENSION_MAPPINGS
+4. Modifying the binary detection logic in get_file_content()
+
 ## Development
 
 To contribute to the project:
@@ -179,7 +245,7 @@ To contribute to the project:
 ## Requirements
 
 - Python 3.8 or higher
-- Git (for `.gitignore` support)
+- Git (optional, for Git metadata and `.gitignore` support)
 
 ## License
 

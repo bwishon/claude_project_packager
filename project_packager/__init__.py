@@ -12,6 +12,7 @@ from . import core
 from . import gitignore
 from . import file_processing
 from . import json_generator
+from . import git_integration
 from .main import main
 from .core import MAX_FILE_SIZE, MAX_TOKENS_PER_MESSAGE, CHARS_PER_TOKEN
 
@@ -22,13 +23,15 @@ __author__ = "Your Name"
 from .gitignore import batch_check_ignore, should_ignore
 from .file_processing import is_binary_file, scan_directory
 from .json_generator import create_json_document
+from .git_integration import get_git_metadata
 
 __all__ = [
     # Modules
     "core",
     "gitignore",
     "file_processing",
-    "xml_generator",
+    "json_generator",
+    "git_integration",
     "main",
     
     # Constants
@@ -41,7 +44,8 @@ __all__ = [
     "should_ignore",
     "is_binary_file",
     "scan_directory",
-    "create_json_document"
+    "create_json_document",
+    "get_git_metadata"
 ]
 
 # Default configuration

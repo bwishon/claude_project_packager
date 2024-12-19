@@ -13,6 +13,7 @@ from .core import (
 )
 from .file_processing import scan_directory, create_file_batch
 from .json_generator import create_json_document
+from .git_integration import GitInfo  # Import GitInfo class
 
 def get_file_statistics(files: list) -> tuple:
     """Generate statistics about the files."""
@@ -54,6 +55,15 @@ def main() -> int:
             
         logging.info(f"Scanning directory: {root_dir}")
         logging.info(f"Output will be written to: {output_file}")
+
+        # Check if directory is a Git repository
+        try:
+            GitInfo(root_dir)
+            logging.info("Git repository detected - will include Git metadata")
+        except ValueError as e:
+            logging.warning(f"Git metadata will not be included: {e}")
+        except Exception as e:
+            logging.warning(f"Error checking Git repository status: {e}")
         
         # Create output directory if it doesn't exist
         output_file.parent.mkdir(parents=True, exist_ok=True)
@@ -61,6 +71,7 @@ def main() -> int:
         # Scan directory for files
         logging.debug("\nStarting file scan...")
         all_files, ignored_files, binary_files = scan_directory(root_dir, args.very_verbose)        
+        
         # Get file statistics
         file_types, total_size = get_file_statistics(all_files)
         
@@ -92,7 +103,7 @@ def main() -> int:
             logging.error("No files found to include!")
             return 1
 
-# Process files in batches if needed
+        # Process files in batches if needed
         max_chars = MAX_TOKENS_PER_MESSAGE * CHARS_PER_TOKEN
         start_idx = 0
         batch_num = 1
