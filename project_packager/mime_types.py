@@ -1,7 +1,7 @@
 """MIME type handling and text content detection."""
 
 from pathlib import Path
-from typing import Set
+from typing import Set, Dict
 
 # Core text MIME types that don't start with text/
 CORE_TEXT_MIME_TYPES: Set[str] = {
@@ -27,19 +27,65 @@ CORE_TEXT_MIME_TYPES: Set[str] = {
     'application/x-markdown'
 }
 
-# Additional file extension to MIME type mappings
-EXTRA_MIME_MAPPINGS = {
-    '.json': 'application/json',
-    '.jsonc': 'application/json',
-    '.yml': 'application/x-yaml',
-    '.yaml': 'application/x-yaml',
-    '.toml': 'application/toml',
-    '.md': 'application/x-markdown',
-    '.php': 'application/x-httpd-php',
-    '.sh': 'application/x-sh',
-    '.rb': 'application/x-ruby',
-    '.pl': 'application/x-perl',
-    '.py': 'application/x-python'
+# Files that must match exactly (case-insensitive)
+EXACT_FILENAME_MAPPINGS: Dict[str, str] = {
+    # Common config files
+    '.gitignore': 'text/plain',
+    '.dockerignore': 'text/plain',
+    '.editorconfig': 'text/plain',
+    '.nvmrc': 'text/plain',
+    '.eslintrc': 'text/plain',
+    '.prettierrc': 'text/plain',
+    '.babelrc': 'text/plain',
+    '.browserslistrc': 'text/plain',
+    '.dev.vars': 'text/plain',
+    '.env.local': 'text/plain',
+    '.env.development': 'text/plain',
+    '.env.test': 'text/plain',
+    '.env.production': 'text/plain',
+    # Special files
+    'Makefile': 'text/plain',
+    'Dockerfile': 'text/plain',
+    'LICENSE': 'text/plain',
+    'LICENCE': 'text/plain',
+    'COPYING': 'text/plain',
+    'README': 'text/plain',
+    'CHANGELOG': 'text/plain',
+    'CHANGES': 'text/plain',
+    'NEWS': 'text/plain',
+    '.ruby-version': 'text/plain',
+    '.python-version': 'text/plain',
+    '.node-version': 'text/plain',
+    'requirements.txt': 'text/plain',
+    'Pipfile': 'text/plain',
+}
+
+# Extensions to match (without leading dot)
+EXTENSION_MAPPINGS: Dict[str, str] = {
+    # Data formats
+    'json': 'application/json',
+    'jsonc': 'application/json',
+    'yml': 'application/x-yaml',
+    'yaml': 'application/x-yaml',
+    'toml': 'application/toml',
+    'md': 'application/x-markdown',
+    # Programming languages
+    'php': 'application/x-httpd-php',
+    'sh': 'application/x-sh',
+    'rb': 'application/x-ruby',
+    'pl': 'application/x-perl',
+    'py': 'application/x-python',
+    # Common text files
+    'txt': 'text/plain',
+    'ini': 'text/plain',
+    'cfg': 'text/plain',
+    'conf': 'text/plain',
+    'config': 'text/plain',
+    'properties': 'text/plain',
+    'lock': 'text/plain',
+    'env': 'text/plain',
+    'req': 'text/plain',
+    'vars': 'text/plain',
 }
 
 def is_text_mime_type(mime_type: str, additional_types: Set[str] = None) -> bool:
@@ -57,18 +103,30 @@ def setup_mime_types() -> None:
     import mimetypes
     if not mimetypes.inited:
         mimetypes.init()
-    for ext, mime_type in EXTRA_MIME_MAPPINGS.items():
-        mimetypes.add_type(mime_type, ext)
+        
+    # Register extensions
+    for ext, mime_type in EXTENSION_MAPPINGS.items():
+        mimetypes.add_type(mime_type, f'.{ext}')
 
 def get_mime_type(file_path: Path) -> str:
     """Get MIME type for a file with enhanced detection."""
     import mimetypes
     setup_mime_types()
+    
+    # First check for exact filename matches (case-insensitive)
+    lower_name = file_path.name.lower()
+    for pattern, mime_type in EXACT_FILENAME_MAPPINGS.items():
+        if lower_name == pattern.lower():
+            return mime_type
+            
+    # Then check extension-based mapping
     mime_type, _ = mimetypes.guess_type(str(file_path))
     if not mime_type:
-        ext = file_path.suffix.lower()
-        if ext in EXTRA_MIME_MAPPINGS:
-            return EXTRA_MIME_MAPPINGS[ext]
+        # Check single extension
+        ext = file_path.suffix.lower().lstrip('.')
+        if ext in EXTENSION_MAPPINGS:
+            return EXTENSION_MAPPINGS[ext]
+            
     return mime_type or 'application/octet-stream'
 
 def get_file_content(file_path: Path, mime_type: str) -> tuple[str, bool, str]:
