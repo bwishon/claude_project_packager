@@ -6,32 +6,7 @@ import logging
 import mimetypes
 from typing import List, Tuple, Dict
 import os
-
-def get_mime_type(file_path: Path) -> str:
-    """Get MIME type for file with enhanced detection."""
-    if not mimetypes.inited:
-        mimetypes.init()
-        
-    # Add common development file types
-    mimetypes.add_type('text/markdown', '.md')
-    mimetypes.add_type('text/x-python', '.py')
-    mimetypes.add_type('text/javascript', '.js')
-    mimetypes.add_type('text/typescript', '.ts')
-    mimetypes.add_type('text/x-yaml', '.yml')
-    mimetypes.add_type('text/x-yaml', '.yaml')
-    
-    mime_type, _ = mimetypes.guess_type(str(file_path))
-    
-    if not mime_type:
-        ext = file_path.suffix.lower()
-        if ext in {'.svelte', '.vue'}:
-            mime_type = 'text/plain'
-        elif ext in {'.json', '.jsonc'}:
-            mime_type = 'application/json'
-        elif ext in {'.tsx', '.jsx'}:
-            mime_type = 'text/typescript'
-    
-    return mime_type or 'text/plain'
+from .mime_types import get_mime_type, get_file_content
 
 def build_directory_structure(files: List[Path], root_dir: Path) -> List[Dict]:
     """Build directory structure with file counts."""
@@ -85,16 +60,14 @@ def create_files_section(root_dir: Path, files: List[Path]) -> List[Dict]:
                 "mime_type": mime_type
             }
             
-            try:
-                with open(file_path, 'rb') as f:
-                    content = f.read()
-                    if mime_type.startswith('text/'):
-                        file_data["content"] = content.decode('utf-8')
-                    else:
-                        file_data["content_base64"] = base64.b64encode(content).decode('ascii')
-            except (OSError, UnicodeDecodeError) as e:
-                logging.warning(f"Skipping content for {file_path} - {type(e).__name__}: {e}")
-                file_data["content"] = f"Error reading file: {type(e).__name__} - {str(e)}"
+            content, is_base64, error = get_file_content(file_path, mime_type)
+            if error:
+                logging.warning(f"Issue with {file_path}: {error}")
+                file_data["error"] = error
+            elif is_base64:
+                file_data["content_base64"] = content
+            else:
+                file_data["content"] = content
                 
             file_list.append(file_data)
                 

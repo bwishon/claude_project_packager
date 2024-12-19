@@ -11,7 +11,7 @@ This package provides functionality to:
 from . import core
 from . import gitignore
 from . import file_processing
-from . import xml_generator
+from . import json_generator
 from .main import main
 from .core import MAX_FILE_SIZE, MAX_TOKENS_PER_MESSAGE, CHARS_PER_TOKEN
 
