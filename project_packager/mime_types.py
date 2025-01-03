@@ -14,6 +14,7 @@ CORE_TEXT_MIME_TYPES: Set[str] = {
     'application/xml',
     # Web technologies
     'application/javascript',
+    'application/typescript',
     'application/ecmascript',
     'application/graphql',
     # Programming languages
@@ -34,6 +35,7 @@ EXACT_FILENAME_MAPPINGS: Dict[str, str] = {
     '.dockerignore': 'text/plain',
     '.editorconfig': 'text/plain',
     '.nvmrc': 'text/plain',
+    '.npmrc': 'text/plain',
     '.eslintrc': 'text/plain',
     '.prettierrc': 'text/plain',
     '.babelrc': 'text/plain',
@@ -58,6 +60,7 @@ EXACT_FILENAME_MAPPINGS: Dict[str, str] = {
     '.node-version': 'text/plain',
     'requirements.txt': 'text/plain',
     'Pipfile': 'text/plain',
+    '.prettierignore': 'text/plain',
 }
 
 # Extensions to match (without leading dot)
@@ -75,6 +78,13 @@ EXTENSION_MAPPINGS: Dict[str, str] = {
     'rb': 'application/x-ruby',
     'pl': 'application/x-perl',
     'py': 'application/x-python',
+    # Web technologies
+    'js': 'application/javascript',
+    'ts': 'application/typescript',
+    'es': 'application/ecmascript',
+    'graphql': 'application/graphql',
+    'svelte': 'application/javascript',
+    'mermaid': 'text/mermaid',  
     # Common text files
     'txt': 'text/plain',
     'ini': 'text/plain',
