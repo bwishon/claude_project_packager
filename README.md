@@ -41,7 +41,7 @@ Arguments:
   project_dir            Project directory to package (default: current directory)
 
 Options:
-  -o, --output          Output JSON file name (default: claude_project.json)
+  -o, --output          Output JSON file name (default: project-bundle.json)
   -v, --verbose         Enable verbose output
   -vv, --very-verbose   Enable very verbose debug output
   --log-file FILE       Write detailed logs to specified file

@@ -48,7 +48,7 @@ def scan_directory(root_dir: Path, very_verbose: bool = False) -> Tuple[List[Pat
             if path.name == '.gitignore':
                 explicit_ignores.append((str(path.relative_to(root_dir)), "Configuration file"))
                 continue
-            if path.name.startswith('claude_project') and path.suffix == '.json':
+            if path.name.startswith('project-bundle') and path.suffix == '.json':
                 explicit_ignores.append((str(path.relative_to(root_dir)), "Project packager output"))
                 continue
             all_files.append(path)

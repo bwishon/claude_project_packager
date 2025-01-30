@@ -56,8 +56,8 @@ def parse_arguments():
     )
     parser.add_argument('project_dir', nargs='?', default=os.getcwd(),
                        help='Project directory to package (default: current directory)')
-    parser.add_argument('-o', '--output', default='claude_project.json', 
-                       help='Output JSON file name (default: claude_project.json)')
+    parser.add_argument('-o', '--output', default='project-bundle.json', 
+                       help='Output JSON file name (default: project-bundle.json)')
     parser.add_argument('-v', '--verbose', action='store_true',
                        help='Enable verbose output')
     parser.add_argument('-vv', '--very-verbose', action='store_true',
