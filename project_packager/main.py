@@ -103,12 +103,12 @@ def main() -> int:
             logging.error("No files found to include!")
             return 1
 
-        # Process files in batches if needed
+        # Process files in batches
         max_chars = MAX_TOKENS_PER_MESSAGE * CHARS_PER_TOKEN
         start_idx = 0
         batch_num = 1
-        processed_files = set()
-        
+        output_files = []  # Keep track of all output files
+
         while start_idx < len(all_files):
             try:
                 batch_files, new_idx = create_file_batch(
@@ -126,26 +126,17 @@ def main() -> int:
                     start_idx = new_idx
                     continue
                 
-                # Generate XML for this batch
-                if new_idx < len(all_files):
-                    output_path = create_json_document(
-                        root_dir, 
-                        batch_files, 
-                        ignored_files, 
-                        output_file, 
-                        batch_num
-                    )
-                    logging.info(f"Created batch {batch_num}: {output_path}")
-                    batch_num += 1
-                else:
-                    output_path = create_json_document(
-                        root_dir, 
-                        batch_files, 
-                        ignored_files, 
-                        output_file
-                    )
-                    logging.info(f"Created: {output_path}")
-                
+                # Generate JSON for this batch
+                output_path = create_json_document(
+                    root_dir, 
+                    batch_files, 
+                    ignored_files, 
+                    output_file, 
+                    batch_num
+                )
+                logging.info(f"Created batch {batch_num}: {output_path}")
+                output_files.append(output_path)  # Track the output file
+                batch_num += 1
                 start_idx = new_idx
                 
             except Exception as e:
@@ -153,6 +144,13 @@ def main() -> int:
                 if args.verbose:
                     logging.exception("Full traceback:")
                 return 1
+
+        # If there is only one output file, rename it to remove the "-000" suffix
+        if len(output_files) == 1:
+            single_file = output_files[0]
+            new_name = single_file.with_name(f"{single_file.stem[:-4]}.json")  # Remove "-000" from the name
+            single_file.rename(new_name)
+            logging.info(f"Renamed single output file to: {new_name}")
         
         return 0
         

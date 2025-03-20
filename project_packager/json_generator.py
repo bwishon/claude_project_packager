@@ -26,7 +26,7 @@ def build_directory_structure(files: List[Path], root_dir: Path) -> List[Dict]:
             
     return [{"path": path, "file_count": count} for path, count in sorted(directories.items())]
 
-def create_metadata(root_dir: Path, files: List[Path], part: int = None) -> Dict:
+def create_metadata(root_dir: Path, files: List[Path], part: int = None, git_metadata: Dict = None) -> Dict:
     """Create metadata section of JSON document."""
     metadata = {
         "root_directory": str(root_dir),
@@ -36,7 +36,6 @@ def create_metadata(root_dir: Path, files: List[Path], part: int = None) -> Dict
     }
     
     # Add Git metadata if available
-    git_metadata = get_git_metadata(root_dir)
     if git_metadata:
         metadata["git"] = git_metadata
     
@@ -92,21 +91,30 @@ def create_files_section(root_dir: Path, files: List[Path]) -> List[Dict]:
             
     return file_list
 
-def create_json_document(root_dir: Path, files: List[Path], ignored_files: List[Tuple[str, str]], 
-                       output_file: Path, part: int = None) -> Path:
+def create_json_document(
+    root_dir: Path,
+    files: List[Path],
+    ignored_files: List[Tuple[str, str]],
+    output_file: Path,
+    part: int
+) -> Path:
     """Create JSON document containing file contents and directory structure."""
     try:
+        # Include Git metadata only for the first part
+        git_metadata = None
+        if part == 1:
+            git_metadata = get_git_metadata(root_dir)
+
         data = {
-            "metadata": create_metadata(root_dir, files, part),
+            "metadata": create_metadata(root_dir, files, part, git_metadata),
             "directory_structure": build_directory_structure(files, root_dir),
             "files": create_files_section(root_dir, files)
         }
         
         # Create output filename
-        if part is not None:
-            output_path = output_file.with_suffix(f'.part{part}.json')
-        else:
-            output_path = output_file.with_suffix('.json')
+        # Use zero-padded numbering
+        part_str = f"{part - 1:03}"  # Zero-padded part number
+        output_path = output_file.with_name(f"{output_file.stem}-{part_str}.json")
             
         # Write JSON to file
         with open(output_path, 'w', encoding='utf-8') as f:
