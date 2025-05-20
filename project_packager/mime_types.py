@@ -81,6 +81,8 @@ EXTENSION_MAPPINGS: Dict[str, str] = {
     # Web technologies
     'js': 'application/javascript',
     'ts': 'application/typescript',
+    'tsx': 'application/typescript',
+    'jsx': 'application/javascript',
     'es': 'application/ecmascript',
     'graphql': 'application/graphql',
     'svelte': 'application/javascript',
