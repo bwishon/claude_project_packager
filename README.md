@@ -84,11 +84,28 @@ project-packager . -v --log-file=packager.log
 
 ### Supported Binary Formats
 The tool automatically detects and includes these binary formats:
-- Images: .png, .jpg, .jpeg, .gif
-- Audio: .mp3, .wav, .ogg
-- Video: .mp4, .avi, .mov
 
-These files are base64 encoded in the output JSON for compatibility with large language models.
+#### Images
+- Standard formats: .png, .jpg, .jpeg, .gif
+- Vector graphics: .svg
+- Other formats: .webp, .bmp
+
+#### Audio
+- Standard formats: .mp3, .wav, .ogg
+- High-quality formats: .flac, .aac
+
+#### Video
+- Standard formats: .mp4, .avi, .mov
+- Other formats: .mkv, .webm
+
+#### Document Formats (with text extraction)
+- PDF: .pdf
+- E-books: .epub
+- Microsoft Office: .docx, .doc, .xlsx, .xls, .pptx, .ppt
+- Open Document: .odt
+- Rich Text: .rtf
+
+All these files are base64 encoded in the output JSON for compatibility with large language models, while preserving the original content for AI analysis.
 
 ### Comprehensive Metadata
 - File system structure preservation

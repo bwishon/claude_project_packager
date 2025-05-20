@@ -12,9 +12,15 @@ def log_verbose(message):
 def is_binary_file(file_path: str) -> Tuple[bool, bool, str]:
     """Check if file is binary and if it's a type that Claude can process."""
     processable_binary_extensions = {
-        '.png', '.jpg', '.jpeg', '.gif',  # Images
-        '.mp3', '.wav', '.ogg',  # Audio
-        '.mp4', '.avi', '.mov'  # Video
+        # Images
+        '.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bmp', 
+        # Audio
+        '.mp3', '.wav', '.ogg', '.flac', '.aac',
+        # Video
+        '.mp4', '.avi', '.mov', '.mkv', '.webm',
+        # Documents with text that Claude can understand
+        '.pdf', '.epub', '.docx', '.doc', '.xlsx', '.xls', 
+        '.pptx', '.ppt', '.odt', '.rtf'
     }
     
     # Check if it's a binary file type that Claude can process

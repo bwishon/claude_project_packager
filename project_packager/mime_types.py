@@ -25,7 +25,18 @@ CORE_TEXT_MIME_TYPES: Set[str] = {
     'application/x-python',
     # Config and documentation
     'application/x-config',
-    'application/x-markdown'
+    'application/x-markdown',
+    # Document formats that Claude can understand
+    'application/pdf',
+    'application/epub+zip',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',  # docx
+    'application/msword',  # doc
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',  # xlsx
+    'application/vnd.ms-excel',  # xls
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',  # pptx
+    'application/vnd.ms-powerpoint',  # ppt
+    'application/vnd.oasis.opendocument.text',  # odt
+    'application/rtf'  # rtf
 }
 
 # Files that must match exactly (case-insensitive)
@@ -72,6 +83,17 @@ EXTENSION_MAPPINGS: Dict[str, str] = {
     'yaml': 'application/x-yaml',
     'toml': 'application/toml',
     'md': 'application/x-markdown',
+    # Document formats
+    'pdf': 'application/pdf',
+    'epub': 'application/epub+zip', 
+    'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'doc': 'application/msword',
+    'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'xls': 'application/vnd.ms-excel',
+    'pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    'ppt': 'application/vnd.ms-powerpoint',
+    'odt': 'application/vnd.oasis.opendocument.text',
+    'rtf': 'application/rtf',
     # Programming languages
     'php': 'application/x-httpd-php',
     'sh': 'application/x-sh',
@@ -144,23 +166,41 @@ def get_mime_type(file_path: Path) -> str:
 def get_file_content(file_path: Path, mime_type: str) -> tuple[str, bool, str]:
     """Read file content with smart encoding detection."""
     import base64
-    if not is_text_mime_type(mime_type):
+    
+    # List of document MIME types that should always be treated as binary
+    document_binary_types = {
+        'application/pdf', 
+        'application/epub+zip',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        'application/vnd.ms-powerpoint',
+        'application/vnd.oasis.opendocument.text',
+        'application/rtf'
+    }
+    
+    # Always handle document formats as binary, regardless of is_text_mime_type result
+    if mime_type in document_binary_types or not is_text_mime_type(mime_type):
         try:
             with open(file_path, 'rb') as f:
                 content = base64.b64encode(f.read()).decode('ascii')
             return content, True, ""
         except Exception as e:
             return "", True, f"Error reading binary file: {str(e)}"
+            
+    # Try to read as text first
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
             return f.read(), False, ""
     except UnicodeDecodeError:
-        pass
+        # Silently fall back to binary for text files with encoding issues
+        try:
+            with open(file_path, 'rb') as f:
+                content = base64.b64encode(f.read()).decode('ascii')
+            return content, True, ""  # No error message for fallback
+        except Exception as e:
+            return "", True, f"Error in base64 fallback: {str(e)}"
     except Exception as e:
         return "", False, f"Error reading text file: {str(e)}"
-    try:
-        with open(file_path, 'rb') as f:
-            content = base64.b64encode(f.read()).decode('ascii')
-        return content, True, "Fallback to base64 due to encoding issues"
-    except Exception as e:
-        return "", True, f"Error in base64 fallback: {str(e)}"
